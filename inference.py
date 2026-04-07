@@ -41,7 +41,7 @@ load_dotenv(_HERE.parent / ".env")   # also check workspace root .env
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN     = os.getenv("HF_TOKEN",     "")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 BENCHMARK    = "ticket_router"
 
 TASK_TYPES   = ["easy", "medium", "hard"]
@@ -143,7 +143,7 @@ def log_end(success: bool, steps: int, score: float, rewards: list) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     print(
         f"[END] success={str(success).lower()} steps={steps} "
-        f"score={score:.3f} rewards={rewards_str}",
+        f"score={score:.2f} rewards={rewards_str}",
         flush=True,
     )
 
