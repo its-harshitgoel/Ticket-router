@@ -19,7 +19,7 @@ Scoring (per episode, single step):
   -0.3  wrong team
   -0.2  overloaded team chosen when a better option exists (queue > 10)
 
-Score is clamped to [0.0, 1.0].
+Score is clamped to [0.01, 0.99] — strictly between 0 and 1 as required by the hackathon spec.
 """
 
 from __future__ import annotations
@@ -244,19 +244,19 @@ SCENARIOS: Dict[str, List[Dict[str, Any]]] = {
         },
         {
             "scenario_id": "H002",
-            "subject": "Something is wrong with my account or billing — not sure which",
-            "body": "I tried to update my payment method this morning and the page just kept refreshing without saving. I'm also seeing a banner that says Account suspended — payment required even though my card should be valid.",
-            "customer_tier": "standard",
+            "subject": "Cannot access invoice history — says 'plan does not include billing history'",
+            "body": "When I navigate to Billing > Invoice History I see the message 'Your current plan does not include billing history'. But I'm on the Business plan, same as my colleague who can view their invoices without any issue. I have not changed my plan or missed any payments. My account settings show the correct subscription tier.",
+            "customer_tier": "premium",
             "team_status": _STRAINED_TEAMS,
-            "expected_team": "Billing", "expected_priority": "high", "expected_urgency": "high",
+            "expected_team": "Account", "expected_priority": "medium", "expected_urgency": "medium",
         },
         {
             "scenario_id": "H003",
-            "subject": "User unable to collaborate with team — access or feature issue?",
-            "body": "One of our users is getting an error Collaboration disabled for this account when trying to share a document with teammates. Other users on our plan can collaborate fine. Our SLA requires this resolved within 4 hours.",
+            "subject": "All users cannot authenticate since v4.2 deployment",
+            "body": "Since your v4.2 release deployed at 08:00 UTC, our entire organization of 280 users cannot log in. The authentication endpoint returns HTTP 503. We have confirmed this is not a network issue on our end. We need this fixed immediately.",
             "customer_tier": "enterprise",
-            "team_status": _STRAINED_TEAMS,
-            "expected_team": "Escalations", "expected_priority": "high", "expected_urgency": "high",
+            "team_status": _MODERATE_TEAMS,
+            "expected_team": "Tech Support", "expected_priority": "high", "expected_urgency": "high",
         },
         {
             "scenario_id": "H004",
@@ -273,6 +273,46 @@ SCENARIOS: Dict[str, List[Dict[str, Any]]] = {
             "customer_tier": "enterprise",
             "team_status": _STRAINED_TEAMS,
             "expected_team": "Escalations", "expected_priority": "high", "expected_urgency": "high",
+        },
+        {
+            "scenario_id": "H006",
+            "subject": "Urgent: billing overcharge AND API failures — both unresolved from last week",
+            "body": "We have two open issues that require immediate attention. First: we were overcharged $2,000 on the latest invoice for Overage Units we did not use — a ticket was opened 8 days ago with no resolution. Second: our order processing API has been returning intermittent 500 errors for the past 6 hours, affecting live transactions. Both issues are still unresolved.",
+            "customer_tier": "enterprise",
+            "team_status": _STRAINED_TEAMS,
+            "expected_team": "Escalations", "expected_priority": "high", "expected_urgency": "high",
+        },
+        {
+            "scenario_id": "H007",
+            "subject": "All reports deleted — 2 years of business data gone",
+            "body": "I logged in this morning to find that all 847 of my historical reports have been completely wiped. I run a small business and this data is irreplaceable — it represents 2 years of analytics. I did not delete anything and I am the only administrator. I cannot determine whether this is a system bug, a storage failure, or some form of unauthorized access.",
+            "customer_tier": "standard",
+            "team_status": _STRAINED_TEAMS,
+            "expected_team": "Escalations", "expected_priority": "high", "expected_urgency": "high",
+        },
+        {
+            "scenario_id": "H008",
+            "subject": "We urgently need bulk user import — enterprise rollout blocked",
+            "body": "Our enterprise deployment is scheduled for Monday and we need to onboard 500 users. The manual user creation process in the UI is far too slow. We need a CSV bulk import feature immediately. Please escalate this to your product team as our entire rollout depends on it.",
+            "customer_tier": "enterprise",
+            "team_status": _STRAINED_TEAMS,
+            "expected_team": "Product", "expected_priority": "high", "expected_urgency": "high",
+        },
+        {
+            "scenario_id": "H009",
+            "subject": "Account suspended — payment issue or system glitch?",
+            "body": "My account shows 'Suspended — payment overdue' but I paid my invoice 3 days ago and have the bank confirmation. My card was successfully charged. I cannot access any of my data or projects. I have tried logging out and logging back in but the suspension banner remains.",
+            "customer_tier": "standard",
+            "team_status": _STRAINED_TEAMS,
+            "expected_team": "Billing", "expected_priority": "high", "expected_urgency": "high",
+        },
+        {
+            "scenario_id": "H010",
+            "subject": "Refund approved 5 days ago — still not reflected in dashboard or bank",
+            "body": "I received an email 5 days ago confirming my $199 refund was approved and would appear within 3-5 business days. Today is day 5 and the invoice still shows 'Paid — no refund'. My bank statement also does not show the credit. Could you confirm the refund is still being processed or if there was an error?",
+            "customer_tier": "standard",
+            "team_status": _STRAINED_TEAMS,
+            "expected_team": "Billing", "expected_priority": "medium", "expected_urgency": "medium",
         },
     ],
 }

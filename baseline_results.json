@@ -1,0 +1,93 @@
+[
+  {
+    "scenario_id": "E001",
+    "task": "easy_seed0",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.3,
+    "action": {"primary_team": "Billing", "priority": "high", "urgency": "high"}
+  },
+  {
+    "scenario_id": "E002",
+    "task": "easy_seed1",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.2,
+    "action": {"primary_team": "Account", "priority": "high", "urgency": "high"}
+  },
+  {
+    "scenario_id": "E003",
+    "task": "easy_seed2",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.5,
+    "action": {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
+  },
+  {
+    "scenario_id": "M001",
+    "task": "medium_seed0",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.1,
+    "action": {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
+  },
+  {
+    "scenario_id": "M002",
+    "task": "medium_seed1",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.1,
+    "action": {"primary_team": "Tech Support", "priority": "medium", "urgency": "medium"}
+  },
+  {
+    "scenario_id": "M003",
+    "task": "medium_seed2",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 1.7,
+    "action": {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
+  },
+  {
+    "scenario_id": "H001",
+    "task": "hard_seed0",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.7,
+    "action": {"primary_team": "Escalations", "priority": "medium", "urgency": "medium"}
+  },
+  {
+    "scenario_id": "H002",
+    "task": "hard_seed1",
+    "success": false,
+    "steps": 1,
+    "score": 0.40,
+    "rewards": 0.1,
+    "elapsed_s": 1.2,
+    "action": {"primary_team": "Billing", "priority": "medium", "urgency": "medium"},
+    "note": "domain-shift trap — model matched 'invoice history' keyword to Billing; correct answer is Account (permissions issue)"
+  },
+  {
+    "scenario_id": "H003",
+    "task": "hard_seed2",
+    "success": true,
+    "steps": 1,
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 2.1,
+    "action": {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
+  }
+]

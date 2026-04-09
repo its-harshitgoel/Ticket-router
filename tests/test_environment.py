@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.ticket_router_environment import TicketRouterEnvironment, SCENARIOS
+from server.ticket_router_environment import TicketRouterEnvironment, SCENARIOS, infer_routing
 from models import TicketRouterAction
 
 VALID_TEAMS    = ["Billing", "Tech Support", "Account", "Product", "Escalations"]
@@ -217,10 +217,141 @@ class TestPerfectScore:
         assert self._perfect_score("hard", 2) == 0.99
 
     def test_mean_score_perfect_actions(self):
-        """All 9 benchmark scenarios with correct actions → mean score = 1.0."""
+        """All 9 benchmark scenarios with correct actions → mean score = 0.99 (clamped from 1.0)."""
         all_scores = []
         for task_type in ["easy", "medium", "hard"]:
             for seed in self.SEEDS:
                 all_scores.append(self._perfect_score(task_type, seed))
         mean = sum(all_scores) / len(all_scores)
         assert mean == 0.99, f"Expected mean=0.99, got {mean:.4f}"
+
+
+class TestDynamicModeRouting:
+    """
+    Dynamic mode infers expected routing from ticket text via keyword rules.
+
+    Tests verify that infer_routing() drives the expected values stored in the
+    scenario, and that stepping with the correct inferred action yields score=0.99.
+    """
+
+    def setup_method(self):
+        self.env = TicketRouterEnvironment()
+
+    def _reset_and_step(self, ticket_body: str, customer_tier: str = "standard"):
+        """
+        Reset in dynamic mode and immediately step with the inferred routing action.
+        Returns (obs, step_result) so tests can inspect both.
+        """
+        obs = self.env.reset(ticket_body=ticket_body, customer_tier=customer_tier)
+        inferred = infer_routing(obs.ticket_body, obs.ticket_subject)
+        action = TicketRouterAction(
+            primary_team=inferred["team"],
+            priority=inferred["priority"],
+            urgency=inferred["urgency"],
+        )
+        result = self.env.step(action)
+        return obs, result
+
+    def test_dynamic_billing_keywords(self):
+        obs, result = self._reset_and_step(
+            "I was overcharged on my invoice this month. Please process a refund."
+        )
+        assert obs.task_type == "dynamic"
+        assert result.metadata["expected_team"] == "Billing"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_account_keywords(self):
+        _, result = self._reset_and_step(
+            "I cannot login. My password reset email never arrives."
+        )
+        assert result.metadata["expected_team"] == "Account"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_tech_support_keywords(self):
+        _, result = self._reset_and_step(
+            "The API is returning 500 errors on every call. There is a crash in production."
+        )
+        assert result.metadata["expected_team"] == "Tech Support"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_product_keywords(self):
+        _, result = self._reset_and_step(
+            "I would like to suggest a new feature for CSV export. No rush, whenever."
+        )
+        assert result.metadata["expected_team"] == "Product"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_escalations_fallback_no_keywords(self):
+        # Text with no team or urgency keywords → Escalations fallback
+        obs, result = self._reset_and_step("Hi there, just checking in.")
+        assert obs.task_type == "dynamic"
+        assert result.metadata["expected_team"] == "Escalations"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_high_urgency_keywords(self):
+        _, result = self._reset_and_step(
+            "This is an emergency. Production down, we are completely blocked, need help asap."
+        )
+        assert result.metadata["expected_priority"] == "high"
+        assert result.metadata["expected_urgency"] == "high"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_low_urgency_keywords(self):
+        _, result = self._reset_and_step(
+            "I would like a new feature. No rush, whenever you have time."
+        )
+        assert result.metadata["expected_priority"] == "low"
+        assert result.metadata["expected_urgency"] == "low"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_enterprise_tier_preserved(self):
+        obs, result = self._reset_and_step(
+            "Invoice shows an incorrect charge of $500.", customer_tier="enterprise"
+        )
+        assert obs.customer_tier == "enterprise"
+        assert result.metadata["expected_team"] == "Billing"
+
+    def test_dynamic_multi_intent_billing_wins_over_account(self):
+        # "invoice" + "charge" = 2 Billing keywords; "login" = 1 Account keyword → Billing wins
+        _, result = self._reset_and_step(
+            "My invoice shows a wrong charge. Also I cannot login to review it."
+        )
+        assert result.metadata["expected_team"] == "Billing"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_keyword_stuffing_routes_correctly(self):
+        # Repeating "refund" many times still counts as 1 Billing keyword (presence check, not count)
+        _, result = self._reset_and_step("refund refund refund refund refund")
+        assert result.metadata["expected_team"] == "Billing"
+        assert result.metadata["score"] == 0.99
+        # Confirm wrong-team action still scores low — stuffing doesn't bypass the grader
+        self.env.reset(ticket_body="refund refund refund refund refund")
+        wrong = self.env.step(
+            TicketRouterAction(primary_team="Tech Support", priority="medium", urgency="medium")
+        )
+        assert wrong.metadata["score"] < 0.6  # wrong team → no +0.6
+
+    def test_dynamic_billing_enterprise_high_urgency(self):
+        # Enterprise billing ticket with urgency keywords → Billing/high/high
+        _, result = self._reset_and_step(
+            "We have been overcharged $5,000 on our enterprise invoice. "
+            "This must be reversed immediately — our accounting closes today.",
+            customer_tier="enterprise",
+        )
+        assert result.metadata["expected_team"] == "Billing"
+        assert result.metadata["expected_priority"] == "high"
+        assert result.metadata["expected_urgency"] == "high"
+        assert result.metadata["score"] == 0.99
+
+    def test_dynamic_inference_vs_preset_consistency(self):
+        # Dynamic mode on E001 body should infer the same team as the preset expected
+        scenario = SCENARIOS["easy"][0]   # E001: Billing / high / high
+        inferred = infer_routing(scenario["body"], scenario["subject"])
+        assert inferred["team"] == scenario["expected_team"], (
+            f"Dynamic infer_routing disagrees with preset: "
+            f"got {inferred['team']}, expected {scenario['expected_team']}"
+        )
+        # Step with the inferred action → should score 0.99
+        obs, result = self._reset_and_step(scenario["body"])
+        assert result.metadata["expected_team"] == scenario["expected_team"]
+        assert result.metadata["score"] == 0.99

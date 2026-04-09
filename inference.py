@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -98,30 +99,30 @@ IMPORTANT: priority and urgency are almost always the same value. Set both ident
 EXAMPLES (follow these patterns exactly):
 
 Example 1 — Multi-issue subject but customer states a clear primary concern:
-  Subject: "Can't log in AND have a question about my invoice"
-  Body: "...My primary concern right now is getting back into my account."
+  Subject: "Account locked AND overdue invoice question"
+  Body: "I can't log in since this morning — my 2FA code is rejected. Also I received an invoice last month with a charge I don't recognise. My biggest concern right now is regaining access."
   → {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
-  Reason: Customer explicitly named Account as their primary concern. Route there.
+  Reason: Customer explicitly stated access as their primary concern. Route to Account. No urgency words → medium.
 
 Example 2 — Ambiguous subject but body reveals billing root cause:
-  Subject: "Something wrong with my account or billing — not sure which"
-  Body: "I tried to update my payment method and the page keeps refreshing. I see a banner: Account suspended — payment required."
+  Subject: "Service not working — payment or account problem?"
+  Body: "My dashboard shows 'Subscription expired — renew to continue'. I tried to renew but the checkout page gives a payment declined error even though my card is valid. Everything was working yesterday."
   → {"primary_team": "Billing", "priority": "high", "urgency": "high"}
-  Reason: Body shows payment method failure + suspended-due-to-payment = billing root. Service blocked = high urgency.
+  Reason: Root cause is payment failure on checkout; service is blocked = high urgency → Billing.
 
-Example 3 — Enterprise + SLA = Escalations even if team seems clear:
-  Subject: "User unable to collaborate — access or feature issue?"
-  Body: "One user gets error. Others on same plan are fine. Our SLA requires this resolved within 4 hours."
+Example 3 — Enterprise + SLA requirement = Escalations regardless of issue type:
+  Subject: "File sharing broken for one user — feature or access bug?"
+  Body: "A single user on our team gets 'Sharing unavailable' when attaching files. Other users on the same plan work fine. Our enterprise contract requires same-day resolution for service disruptions."
   Customer tier: enterprise
   → {"primary_team": "Escalations", "priority": "high", "urgency": "high"}
-  Reason: Enterprise + explicit SLA time requirement → Escalations.
+  Reason: Enterprise + explicit SLA / time-bound requirement → Escalations regardless of root cause.
 
-Example 4 — Enterprise + clear API bug, no SLA = Tech Support:
-  Subject: "API returning 500 errors on all POST requests"
-  Body: "...breaking our production checkout flow and affecting thousands of customers. We need a hotfix immediately."
+Example 4 — Enterprise + clear API bug, no SLA = Tech Support (not Escalations):
+  Subject: "Webhooks silently failing on all POST /events calls"
+  Body: "Our webhook consumer stopped receiving events after Tuesday's release. The delivery log shows HTTP 500 on every POST /events call. GET endpoints work fine. This is blocking our data pipeline. We need a fix immediately."
   Customer tier: enterprise
   → {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
-  Reason: Clear API/system bug. No SLA mentioned. "Immediately" = high urgency.
+  Reason: Clear system-wide API failure. No SLA time requirement mentioned. Enterprise + clear bug → Tech Support.
 """
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -188,6 +189,7 @@ def _call_llm(client: OpenAI, obs) -> Optional[dict]:
             ],
             temperature=0.2,
             max_tokens=150,
+            timeout=30.0,
         )
         raw = (resp.choices[0].message.content or "").strip()
         # Strip markdown fences if present
@@ -203,7 +205,8 @@ def _call_llm(client: OpenAI, obs) -> Optional[dict]:
             if m:
                 return json.loads(m.group())
             return None
-    except Exception:
+    except Exception as exc:
+        print(f"[LLM_ERROR] {type(exc).__name__}: {exc}", flush=True, file=sys.stderr)
         return None
 
 
@@ -227,6 +230,7 @@ def run_episode(
 ) -> float:
     task_label = f"{task_type}_seed{seed}"
     log_start(task=task_label, model=MODEL_NAME)
+    _t0 = time.monotonic()
 
     obs = env.reset(task_type=task_type, seed=seed)
     action_dict, llm_error = _get_action(client, obs)
@@ -253,17 +257,25 @@ def run_episode(
     done      = result_obs.done
     score     = result_obs.metadata.get("score", 0.0)
     error_msg = llm_error
+    elapsed   = time.monotonic() - _t0
 
     log_step(step=1, action=action_str, reward=reward, done=done, error=error_msg)
     success = score >= 0.6
     log_end(success=success, steps=1, score=score, rewards=[reward])
+    print(f"[TIMING] task={task_label} elapsed={elapsed:.1f}s", flush=True)
     return score
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN or "hf_placeholder")
+    if not HF_TOKEN:
+        print(
+            "[ERROR] HF_TOKEN is not set. Export HF_TOKEN=<your_hf_token> before running.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env    = TicketRouterEnvironment()
 
     all_scores: dict = {t: [] for t in TASK_TYPES}

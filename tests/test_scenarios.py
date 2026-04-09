@@ -22,18 +22,22 @@ class TestScenarioBank:
         for level in TASK_TYPES:
             assert level in SCENARIOS
 
-    def test_each_level_has_5_scenarios(self):
-        for level in TASK_TYPES:
+    def test_easy_and_medium_levels_have_5_scenarios(self):
+        for level in ["easy", "medium"]:
             assert len(SCENARIOS[level]) == 5, \
                 f"{level} has {len(SCENARIOS[level])} scenarios, expected 5"
 
-    def test_total_scenario_count_is_15(self):
+    def test_hard_level_has_10_scenarios(self):
+        assert len(SCENARIOS["hard"]) == 10, \
+            f"hard has {len(SCENARIOS['hard'])} scenarios, expected 10"
+
+    def test_total_scenario_count_is_20(self):
         total = sum(len(SCENARIOS[t]) for t in TASK_TYPES)
-        assert total == 15
+        assert total == 20
 
     def test_all_scenario_ids_are_unique(self):
         ids = [s["scenario_id"] for t in TASK_TYPES for s in SCENARIOS[t]]
-        assert len(ids) == len(set(ids)), "Duplicate scenario_id found"
+        assert len(ids) == len(set(ids)), f"Duplicate scenario_id found in: {ids}"
 
     def test_easy_scenario_ids_start_with_E(self):
         for s in SCENARIOS["easy"]:
