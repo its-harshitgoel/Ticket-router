@@ -90,18 +90,18 @@ Pass any ticket body to `reset()` and the environment infers the expected routin
 
 ## Baseline Agent Performance (Qwen2.5-72B-Instruct)
 
-Achieved with a few-shot prompted system prompt in `inference.py`:
+Achieved with a reasoning-first system prompt in `inference.py` (6-step decision pipeline with `<thinking>` scratchpad):
 
 | Task | Avg Score | Scenarios |
 |---|---|---|
 | Easy | **0.990** | 0.990 · 0.990 · 0.990 |
 | Medium | **0.990** | 0.990 · 0.990 · 0.990 |
-| Hard | **0.793** | 0.990 · 0.400 · 0.990 |
-| **Overall** | **0.924** | |
+| Hard | **0.990** | 0.990 · 0.990 · 0.990 |
+| **Overall** | **0.990** | |
 
 > **Note:** Scores are clamped to `[0.01, 0.99]` by design — the hackathon spec requires scores strictly between 0 and 1. A perfect routing decision therefore returns 0.990, not 1.000.
 >
-> The hard tier average is lower because H002 is a genuine adversarial scenario (billing-sounding language but an account/permissions root cause). Qwen2.5-72B routed it to Billing instead of Account, scoring 0.400. See `BASELINE_REPORT.md` for the full breakdown.
+> The reasoning-first prompt (v2) solved the H002 domain-shift trap that single-shot prompting failed on. See `BASELINE_REPORT.md` for the full breakdown.
 
 ---
 

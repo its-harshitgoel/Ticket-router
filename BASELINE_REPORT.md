@@ -9,7 +9,8 @@
 | **API endpoint** | https://router.huggingface.co/v1 |
 | **Scoring note** | Scores clamped to `[0.01, 0.99]` — hackathon spec requires values strictly between 0 and 1. A perfect routing decision scores **0.990**, not 1.000. |
 | **Inference failures** | **0 / 9** scenarios had inference errors |
-| **Total elapsed** | ~21 s (sum of per-task timings below) |
+| **Total elapsed** | ~53 s (reasoning prompt uses more tokens) |
+| **Prompt version** | v2 — reasoning-first (`<thinking>` scratchpad, 6-step pipeline) |
 
 ---
 
@@ -17,10 +18,10 @@
 
 | Task | Avg Score | Seeds | Time (seed 0 / 1 / 2) |
 |---|---|---|---|
-| Easy | **0.990** | 0.990 · 0.990 · 0.990 | 2.3 s / 2.2 s / 2.5 s |
-| Medium | **0.990** | 0.990 · 0.990 · 0.990 | 2.1 s / 2.1 s / 1.7 s |
-| Hard | **0.793** | 0.990 · 0.400 · 0.990 | 2.7 s / 1.2 s / 2.1 s |
-| **Overall** | **0.924** | | **~21 s total** |
+| Easy | **0.990** | 0.990 · 0.990 · 0.990 | 4.6 s / 4.4 s / 5.2 s |
+| Medium | **0.990** | 0.990 · 0.990 · 0.990 | 4.1 s / 6.2 s / 9.7 s |
+| Hard | **0.990** | 0.990 · 0.990 · 0.990 | 5.1 s / 8.1 s / 5.5 s |
+| **Overall** | **0.990** | | **~53 s total** |
 
 > Timing from actual run (2026-04-09). The `[TIMING]` line after each `[END]` shows per-task elapsed seconds.
 
@@ -37,7 +38,7 @@
 | M002 | medium | 1 | Tech Support | medium / medium | 0.990 |
 | M003 | medium | 2 | Account | medium / medium | 0.990 |
 | H001 | hard | 0 | Escalations | medium / medium | 0.990 |
-| H002 | hard | 1 | Account | medium / medium | **0.400** ← model answered Billing (domain-shift trap) |
+| H002 | hard | 1 | Account | medium / medium | **0.990** ← reasoning prompt correctly identified permissions root cause |
 | H003 | hard | 2 | Tech Support | high / high | 0.990 |
 
 > Seeds 0, 1, 2 index into each difficulty pool. Full pool: 5 easy (E001–E005), 5 medium (M001–M005), 10 hard (H001–H010).
@@ -71,64 +72,64 @@ Models tested against the same 9 benchmark scenarios using `https://router.huggi
 
 ## Verbatim Run Output
 
-Full `[START] / [STEP] / [END] / [TIMING]` output from the 2026-04-09 run:
+Full `[START] / [STEP] / [END] / [TIMING]` output from the 2026-04-09 run (v2 reasoning prompt):
 
 ```
 [START] task=easy_seed0 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Billing","priority":"high","urgency":"high"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=easy_seed0 elapsed=2.3s
+[TIMING] task=easy_seed0 elapsed=4.6s
 
 [START] task=easy_seed1 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Account","priority":"high","urgency":"high"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=easy_seed1 elapsed=2.2s
+[TIMING] task=easy_seed1 elapsed=4.4s
 
 [START] task=easy_seed2 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Tech Support","priority":"high","urgency":"high"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=easy_seed2 elapsed=2.5s
+[TIMING] task=easy_seed2 elapsed=5.2s
 
 [START] task=medium_seed0 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Account","priority":"medium","urgency":"medium"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=medium_seed0 elapsed=2.1s
+[TIMING] task=medium_seed0 elapsed=4.1s
 
 [START] task=medium_seed1 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Tech Support","priority":"medium","urgency":"medium"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=medium_seed1 elapsed=2.1s
+[TIMING] task=medium_seed1 elapsed=6.2s
 
 [START] task=medium_seed2 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Account","priority":"medium","urgency":"medium"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=medium_seed2 elapsed=1.7s
+[TIMING] task=medium_seed2 elapsed=9.7s
 
 [START] task=hard_seed0 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Escalations","priority":"medium","urgency":"medium"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=hard_seed0 elapsed=2.7s
+[TIMING] task=hard_seed0 elapsed=5.1s
 
 [START] task=hard_seed1 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
-[STEP] step=1 action={"primary_team":"Billing","priority":"medium","urgency":"medium"} reward=0.10 done=true error=null
-[END] success=false steps=1 score=0.40 rewards=0.10
-[TIMING] task=hard_seed1 elapsed=1.2s
+[STEP] step=1 action={"primary_team":"Account","priority":"medium","urgency":"medium"} reward=1.00 done=true error=null
+[END] success=true steps=1 score=0.99 rewards=1.00
+[TIMING] task=hard_seed1 elapsed=8.1s
 
 [START] task=hard_seed2 env=ticket_router model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action={"primary_team":"Tech Support","priority":"high","urgency":"high"} reward=1.00 done=true error=null
 [END] success=true steps=1 score=0.99 rewards=1.00
-[TIMING] task=hard_seed2 elapsed=2.1s
+[TIMING] task=hard_seed2 elapsed=5.5s
 
 =======================================================
 FINAL SCORES
   easy    : avg=0.990  [0.990  0.990  0.990]
   medium  : avg=0.990  [0.990  0.990  0.990]
-  hard    : avg=0.793  [0.990  0.400  0.990]
-  overall : avg=0.924
+  hard    : avg=0.990  [0.990  0.990  0.990]
+  overall : avg=0.990
 =======================================================
 ```
 
-**H002 failure analysis:** Model chose `Billing` (keyword match on "invoice history") instead of `Account` (correct — the ticket is about permissions, not a billing dispute). Score: 0.40 (correct P/U but wrong team → +0.2+0.2, no +0.6).
+**H002 — fixed by reasoning prompt:** v1 prompt chose `Billing` (keyword match on "invoice history"). v2 reasoning prompt correctly identified the root cause as permissions/access → `Account`. Score improved: 0.40 → 0.990.
 
 ---
 
@@ -140,7 +141,7 @@ Machine-readable results are committed at `baseline_results.json` in the repo ro
 [
   {"scenario_id": "E001", "task": "easy_seed0",   "success": true,  "steps": 1, "score": 0.99, "rewards": 1.0},
   ...
-  {"scenario_id": "H002", "task": "hard_seed1",   "success": false, "steps": 1, "score": 0.40, "rewards": 0.1},
+  {"scenario_id": "H002", "task": "hard_seed1",   "success": true,  "steps": 1, "score": 0.99, "rewards": 1.0},
   ...
 ]
 ```

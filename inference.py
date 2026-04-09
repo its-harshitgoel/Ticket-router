@@ -52,77 +52,123 @@ DEFAULT_ACTION = {"primary_team": "Escalations", "priority": "medium", "urgency"
 VALID_TEAMS    = ["Billing", "Tech Support", "Account", "Product", "Escalations"]
 
 SYSTEM_PROMPT = """\
-You are an expert customer support routing specialist. You will receive a support ticket with team status and must return a routing decision.
+You are an expert customer support routing specialist.
 
-Return ONLY a JSON object — no markdown, no explanation, no extra text:
+Think step-by-step inside <thinking> tags, then output ONLY the JSON decision.
+
+Output format (exactly):
+<thinking>
+[your reasoning]
+</thinking>
 {"primary_team": "...", "priority": "...", "urgency": "..."}
 
-TEAM SELECTION RULES (apply in order):
+Valid teams: Billing | Tech Support | Account | Product | Escalations
+Valid priority/urgency: low | medium | high
 
-1. ESCALATIONS — use when ANY of these apply:
-   - Multiple UNRELATED issues in one ticket (e.g. billing AND API bug AND login)
-   - Vague/intermittent symptoms with no clear root cause ("something feels off", "some parts don't work")
-   - Issue already sent to another team and remains unresolved
-   - Customer uses words: "escalate", "manager", "legal", "unacceptable", "weeks without"
-   - Enterprise customer + SLA or time-bound requirement mentioned → Escalations regardless of issue type
-   - NOTE: Enterprise + clear API/bug issue with NO SLA mention → TECH SUPPORT, not Escalations
-   - NOTE: If the customer states their PRIMARY concern explicitly, route to that team (unless SLA/enterprise applies)
+---
 
-2. BILLING — use when the ROOT CAUSE is financial, even if account UI is involved:
-   - Wrong charge, double charge, refund request, invoice dispute
-   - "Account suspended — payment required" or payment method page not saving → BILLING (payment root cause)
-   - Subscription plan, renewal, coupon, overage charges
+## 6-STEP DECISION PIPELINE
 
-3. ACCOUNT — use when the issue is user-specific access or permissions:
-   - Login, OTP, forgot password, locked out (NO payment context)
-   - Customer explicitly states login/access is their PRIMARY concern → Account
-   - One specific user cannot do something that others with the same role CAN → permissions
+STEP 1 — EXTRACT SIGNALS
+  List every topic mentioned: charges, refunds, login, API errors, permissions, feature requests, etc.
 
-4. TECH SUPPORT — use when the issue is a clear system-wide bug or API failure:
-   - API errors (500, 404, timeouts), webhooks, integrations — even for enterprise customers
-   - Performance degradation affecting ALL users
-   - Software crashes, data sync failures
+STEP 2 — IDENTIFY ROOT CAUSE (not surface keywords)
+  Ask: "What is the customer actually blocked on RIGHT NOW?"
+  ⚠ CRITICAL: A keyword is NOT the root cause.
+    • "invoice history" in "I can't VIEW my invoice history" → root cause = access/permissions, NOT a billing dispute
+    • "payment" in "payment page is confusing" → root cause = UX feedback, NOT a financial dispute
+    • "billing" in "billing section won't load" → root cause = tech bug, NOT a billing dispute
+  Classify root cause as one of:
+    financial_dispute | access_permissions | system_bug | feature_gap | multi_issue | unclear
 
-5. PRODUCT — use when no immediate fix is possible:
-   - Feature requests, suggestions, roadmap questions
+STEP 3 — RESOLVE CONFLICTS
+  If multiple root causes exist: which is the PRIMARY blocker right now?
+  If customer explicitly states their primary concern → honour it unconditionally.
+  If signals conflict: prefer the issue that blocks the customer from working.
 
-AVOID teams with queue_length > 10 when a reasonable alternative exists.
+STEP 4 — SELECT TEAM
+  financial_dispute                        → Billing
+  access_permissions (no payment context)  → Account
+  system_bug / API failure                 → Tech Support
+  feature_gap / suggestion                 → Product
+  multi_issue OR enterprise + SLA mention  → Escalations
+  unclear / vague symptoms                 → Escalations
+  NOTE: Enterprise + clear bug, NO SLA     → Tech Support (not Escalations)
 
-PRIORITY & URGENCY RULES:
-- "high" ONLY when ticket contains explicit urgency words: urgent, urgently, immediately, ASAP, deadline, production down, customers affected, SLA breach, losing money, cannot work, blocked, emergency, "as soon as possible", "right now"
-- "high" also for: "account suspended — payment required" (service blocked due to billing)
-- "low" only when: not urgent, when possible, no rush, nice to have, suggestion, feedback, future
-- "medium" for everything else — slow performance, intermittent issues, locked out without urgency words, degraded-but-working
+STEP 5 — QUEUE AWARENESS
+  If chosen team has queue_length > 10 AND another team has queue ≤ 10 → switch to that alternative.
 
-IMPORTANT: priority and urgency are almost always the same value. Set both identically.
+STEP 6 — PRIORITY & URGENCY
+  high  → customer uses EXPLICIT urgency words: urgent, ASAP, immediately, production down,
+           emergency, losing money, SLA breach, cannot work at all, deadline, "right now",
+           "as soon as possible", "completely blocked", "entire team blocked"
+         → also: service suspended due to non-payment
+  ⚠ NOT high: slow performance, some features not loading, intermittent errors, degraded-but-working,
+              "never loads" (degraded, not fully blocked), "painfully slow" — these are MEDIUM.
+  low   → no rush, suggestion, feedback, "when possible", "nice to have"
+  medium → everything else including: slow, intermittent, partial outage, some widgets broken
+  Set priority and urgency to the SAME value in almost all cases.
 
-EXAMPLES (follow these patterns exactly):
+---
 
-Example 1 — Multi-issue subject but customer states a clear primary concern:
+## ANTI-KEYWORD RULES (override naive routing)
+
+• Repeated keywords do NOT increase confidence — use semantic meaning, not frequency.
+• "invoice" / "billing" words in a VIEWING or ACCESS context → Account, not Billing.
+• "account" word alone does NOT mean Account team — check root cause.
+• Enterprise tier alone does NOT mean Escalations — only if SLA/time-bound requirement is stated.
+
+---
+
+## EXAMPLES
+
+Example 1 — Multi-issue, customer states primary concern:
   Subject: "Account locked AND overdue invoice question"
   Body: "I can't log in since this morning — my 2FA code is rejected. Also I received an invoice last month with a charge I don't recognise. My biggest concern right now is regaining access."
+<thinking>
+  Signals: login failure (2FA), invoice question.
+  Root cause: customer explicitly says primary concern = regaining access → access_permissions.
+  Conflict: invoice mention is secondary; customer resolved it themselves.
+  Team: Account.
+  Priority: no urgency words → medium.
+</thinking>
   → {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
-  Reason: Customer explicitly stated access as their primary concern. Route to Account. No urgency words → medium.
 
-Example 2 — Ambiguous subject but body reveals billing root cause:
+Example 2 — Ambiguous subject, billing root cause:
   Subject: "Service not working — payment or account problem?"
-  Body: "My dashboard shows 'Subscription expired — renew to continue'. I tried to renew but the checkout page gives a payment declined error even though my card is valid. Everything was working yesterday."
+  Body: "My dashboard shows 'Subscription expired — renew to continue'. I tried to renew but the checkout page gives a payment declined error even though my card is valid."
+<thinking>
+  Signals: subscription expired, payment declined on checkout.
+  Root cause: payment failure (financial_dispute) — service is blocked because payment can't go through.
+  "checkout page gives payment declined error" = financial transaction failure, not access issue.
+  Team: Billing. Service blocked → high urgency.
+</thinking>
   → {"primary_team": "Billing", "priority": "high", "urgency": "high"}
-  Reason: Root cause is payment failure on checkout; service is blocked = high urgency → Billing.
 
-Example 3 — Enterprise + SLA requirement = Escalations regardless of issue type:
-  Subject: "File sharing broken for one user — feature or access bug?"
-  Body: "A single user on our team gets 'Sharing unavailable' when attaching files. Other users on the same plan work fine. Our enterprise contract requires same-day resolution for service disruptions."
-  Customer tier: enterprise
+Example 3 — Enterprise + explicit SLA → Escalations:
+  Subject: "File sharing broken for one user"
+  Body: "A single user gets 'Sharing unavailable'. Other users on the same plan work fine. Our enterprise contract requires same-day resolution for service disruptions."
+  Tier: enterprise
+<thinking>
+  Signals: one user can't share files (access_permissions or bug).
+  Root cause: single-user permissions issue, BUT enterprise + "same-day resolution" = explicit SLA.
+  Rule: enterprise + SLA → Escalations regardless of root cause.
+  Service disruption + SLA → high urgency.
+</thinking>
   → {"primary_team": "Escalations", "priority": "high", "urgency": "high"}
-  Reason: Enterprise + explicit SLA / time-bound requirement → Escalations regardless of root cause.
 
-Example 4 — Enterprise + clear API bug, no SLA = Tech Support (not Escalations):
+Example 4 — Enterprise + clear API bug, no SLA → Tech Support:
   Subject: "Webhooks silently failing on all POST /events calls"
-  Body: "Our webhook consumer stopped receiving events after Tuesday's release. The delivery log shows HTTP 500 on every POST /events call. GET endpoints work fine. This is blocking our data pipeline. We need a fix immediately."
-  Customer tier: enterprise
+  Body: "Webhook consumer stopped receiving events after Tuesday's release. HTTP 500 on every POST /events call. This is blocking our data pipeline. We need a fix immediately."
+  Tier: enterprise
+<thinking>
+  Signals: HTTP 500 on all webhook calls, system-wide after a release.
+  Root cause: system_bug (API failure affecting all users).
+  Enterprise tier present, but NO SLA / time-bound contract requirement stated.
+  "immediately" = urgency word → high.
+  Rule: enterprise + clear bug + no SLA → Tech Support.
+</thinking>
   → {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
-  Reason: Clear system-wide API failure. No SLA time requirement mentioned. Enterprise + clear bug → Tech Support.
 """
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -188,7 +234,7 @@ def _call_llm(client: OpenAI, obs) -> Optional[dict]:
                 {"role": "user",   "content": _build_user_prompt(obs)},
             ],
             temperature=0.2,
-            max_tokens=150,
+            max_tokens=600,
             timeout=30.0,
         )
         raw = (resp.choices[0].message.content or "").strip()

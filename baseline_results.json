@@ -6,7 +6,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.3,
+    "elapsed_s": 4.6,
     "action": {"primary_team": "Billing", "priority": "high", "urgency": "high"}
   },
   {
@@ -16,7 +16,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.2,
+    "elapsed_s": 4.4,
     "action": {"primary_team": "Account", "priority": "high", "urgency": "high"}
   },
   {
@@ -26,7 +26,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.5,
+    "elapsed_s": 5.2,
     "action": {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
   },
   {
@@ -36,7 +36,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.1,
+    "elapsed_s": 4.1,
     "action": {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
   },
   {
@@ -46,7 +46,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.1,
+    "elapsed_s": 6.2,
     "action": {"primary_team": "Tech Support", "priority": "medium", "urgency": "medium"}
   },
   {
@@ -56,7 +56,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 1.7,
+    "elapsed_s": 9.7,
     "action": {"primary_team": "Account", "priority": "medium", "urgency": "medium"}
   },
   {
@@ -66,19 +66,19 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.7,
+    "elapsed_s": 5.1,
     "action": {"primary_team": "Escalations", "priority": "medium", "urgency": "medium"}
   },
   {
     "scenario_id": "H002",
     "task": "hard_seed1",
-    "success": false,
+    "success": true,
     "steps": 1,
-    "score": 0.40,
-    "rewards": 0.1,
-    "elapsed_s": 1.2,
-    "action": {"primary_team": "Billing", "priority": "medium", "urgency": "medium"},
-    "note": "domain-shift trap — model matched 'invoice history' keyword to Billing; correct answer is Account (permissions issue)"
+    "score": 0.99,
+    "rewards": 1.0,
+    "elapsed_s": 8.1,
+    "action": {"primary_team": "Account", "priority": "medium", "urgency": "medium"},
+    "note": "domain-shift trap — reasoning prompt correctly identified permissions root cause (not billing keyword)"
   },
   {
     "scenario_id": "H003",
@@ -87,7 +87,7 @@
     "steps": 1,
     "score": 0.99,
     "rewards": 1.0,
-    "elapsed_s": 2.1,
+    "elapsed_s": 5.5,
     "action": {"primary_team": "Tech Support", "priority": "high", "urgency": "high"}
   }
 ]
